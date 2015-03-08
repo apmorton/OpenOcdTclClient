@@ -276,6 +276,7 @@ namespace OpenOcdTclClient
         private Socket socket = null;
         private readonly ISynchronizeInvoke context;
         private readonly ConcurrentQueue<Command> commands = new ConcurrentQueue<Command>();
+        private readonly List<byte> buffer = new List<byte>();
         private bool started = false;
 
         private void ThreadMain()
@@ -456,26 +457,48 @@ namespace OpenOcdTclClient
             return cmd.Result;
         }
 
+        private string DecodeFromBuffer()
+        {
+            if (buffer.Contains(0x1a))
+            {
+                var end = buffer.IndexOf(0x1a);
+                var bytes = buffer.Take(end).ToArray();
+
+                buffer.RemoveRange(0, end + 1);
+
+                // decode the bytes
+                return Encoding.UTF8.GetString(bytes).Trim();
+            }
+
+            return null;
+        }
+
         private string ReceiveResponse(bool onlyIfAvailable = false)
         {
-            var buffer = new byte[4096];
-            int offset = 0;
+            var buf = new byte[4096];
+
+            // pull from local buffer first
+            var ret = DecodeFromBuffer();
+            if (ret != null)
+                return ret;
 
             // bail if we aren't supposed to block and nothing is available
             if (onlyIfAvailable && socket.Available == 0) return null;
 
             // read until the buffer is full or we have a terminator
-            while (offset < buffer.Length)
+            while (true)
             {
-                offset += socket.Receive(buffer, offset, buffer.Length - offset, SocketFlags.None);
-                if (buffer.Contains((byte)0x1a)) break;
+                var len = socket.Receive(buf, buf.Length, SocketFlags.None);
+                buffer.AddRange(buf.Take(len));
+                if (buffer.Contains(0x1a)) break;
             }
 
-            // get the index of the terminator
-            var end = Array.IndexOf<byte>(buffer, 0x1a);
+            // decode the string
+            ret = DecodeFromBuffer();
+            if (ret != null)
+                return ret;
 
-            // decode the bytes
-            return Encoding.UTF8.GetString(buffer, 0, end).Trim();
+            return "";
         }
 
         private void Invoke(Action action)
