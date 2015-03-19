@@ -109,6 +109,16 @@ namespace OpenOcdTclClient
             return ret;
         }
 
+        public void ItmPort(int channel, bool enable)
+        {
+            DoCommand(String.Format("itm port {0} {1}", channel, enable ? "on" : "off"));
+        }
+
+        public void ItmPorts(bool enable)
+        {
+            DoCommand(String.Format("itm ports {0}", enable ? "on" : "off"));
+        }
+
         #endregion
 
         #region Public Functions
