@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.Windows.Threading;
 
 namespace OpenOcdTclClient
 {
@@ -129,6 +130,14 @@ namespace OpenOcdTclClient
             Port = port;
             Connected = false;
             this.context = context;
+        }
+
+        public OpenOcdTclClient(Dispatcher dispatcher, string hostname = "localhost", int port = 6666)
+        {
+            Hostname = hostname;
+            Port = port;
+            Connected = false;
+            this.dispatcher = dispatcher;
         }
 
         public void Start()
@@ -285,6 +294,7 @@ namespace OpenOcdTclClient
         private Thread thread;
         private Socket socket = null;
         private readonly ISynchronizeInvoke context;
+        private readonly Dispatcher dispatcher;
         private readonly ConcurrentQueue<Command> commands = new ConcurrentQueue<Command>();
         private readonly List<byte> buffer = new List<byte>();
         private bool started = false;
@@ -513,7 +523,10 @@ namespace OpenOcdTclClient
 
         private void Invoke(Action action)
         {
-            context.BeginInvoke((Delegate)action, null);
+            if (context != null)
+                context.BeginInvoke((Delegate)action, null);
+            else
+                dispatcher.BeginInvoke((Delegate)action, null);
         }
 
         #endregion
